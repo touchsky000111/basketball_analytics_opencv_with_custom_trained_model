@@ -13,6 +13,7 @@ import argparse
 from pathlib import Path
 import os
 import torch
+import re
 
 # Import ball detection functionality
 try:
@@ -24,7 +25,7 @@ except ImportError:
 
 
 class BasketballAnalyzer:
-    def __init__(self, ball_rim_model_path=None, shot_model_path=None, player_model_path=None, confidence_threshold=0.3, device=None, use_yolov8n_for_ball=False, use_ball_detect_module=True, ball_model_path="model/best.pt"):
+    def __init__(self, ball_rim_model_path=None, shot_model_path=None, player_model_path=None, confidence_threshold=0.5, device=None, use_yolov8n_for_ball=False, use_ball_detect_module=True, ball_model_path="model/best.pt"):
         """
         Initialize the Basketball Analyzer
         
@@ -209,7 +210,7 @@ class BasketballAnalyzer:
         # Model best.pt detects: 0=rim_a, 1=basketball, 2=rim_b
         self.rim_a_location = None  # xywh: [x, y, w, h] center of the box, width, height
         self.rim_a_bounding_box = None  # xyxy: [x1, y1, x2, y2]
-        self.rim_a_standard_line = None  # Line across rim_a for goal detection
+        self.rim_a_standard_line = None  # Line across rim_a
         self.rim_a_detected = False  # Flag to track if rim_a was detected
         self.rim_a_team = None  # Which team's rim_a: "Team A" (left) or "Team B" (right)
         
@@ -224,7 +225,7 @@ class BasketballAnalyzer:
         # Ball tracking
         self.ball_location = None  # xywh: [x, y, w, h]
         self.previous_ball_location = None  # xywh: [x, y, w, h]
-        self.ball_tracking = []  # List of ball locations relative to rim: [(x_rel, y_rel, frame_number), ...]
+        self.ball_tracking = []  # List of (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, rim_type) for each frame
         self.ball_tracking_history = []  # History of all ball tracking sequences
         self.ball_tracking_ratios = {}  # Dictionary mapping frame_number to ratio (horizontal_distance / ball_radius)
         self.rim_reference = None  # Current reference rim location for coordinate system: {'x': int, 'y': int} or None
@@ -417,21 +418,11 @@ class BasketballAnalyzer:
                         self.rim_reference = new_rim_reference
                         print(f"  Using rim_a as reference axis: ({self.rim_reference['x']}, {self.rim_reference['y']})")
                     else:
-                        # Rim location changed - adjust existing ball tracking coordinates
-                        rim_offset_x = new_rim_reference["x"] - self.rim_reference["x"]
-                        rim_offset_y = new_rim_reference["y"] - self.rim_reference["y"]
-                        if abs(rim_offset_x) > 1 or abs(rim_offset_y) > 1:  # Only adjust if rim moved significantly
-                            # Adjust all existing ball tracking points by the rim movement offset
-                            for i in range(len(self.ball_tracking)):
-                                rel_x, rel_y, frame_num = self.ball_tracking[i]
-                                # Adjust relative coordinates to account for rim movement
-                                self.ball_tracking[i] = (rel_x - rim_offset_x, rel_y - rim_offset_y, frame_num)
-                            self.previous_rim_reference = self.rim_reference.copy()
-                            self.rim_reference = new_rim_reference
-                            print(f"  Rim_a moved: ({self.previous_rim_reference['x']}, {self.previous_rim_reference['y']}) -> ({self.rim_reference['x']}, {self.rim_reference['y']}) | Adjusted {len(self.ball_tracking)} tracking points")
-                        else:
-                            # Small movement, just update reference
-                            self.rim_reference = new_rim_reference
+                        # Rim location changed - update reference (no need to adjust tracking since we store absolute coordinates)
+                        self.previous_rim_reference = self.rim_reference.copy()
+                        self.rim_reference = new_rim_reference
+                        if abs(new_rim_reference["x"] - self.previous_rim_reference["x"]) > 1 or abs(new_rim_reference["y"] - self.previous_rim_reference["y"]) > 1:
+                            print(f"  Rim_a moved: ({self.previous_rim_reference['x']}, {self.previous_rim_reference['y']}) -> ({self.rim_reference['x']}, {self.rim_reference['y']})")
                 elif cls_id == 2:  # rim_b
                     self.rim_b_location = rim_location
                     self.rim_b_bounding_box = np.array([x1, y1, x2, y2])
@@ -448,21 +439,11 @@ class BasketballAnalyzer:
                         self.rim_reference = new_rim_reference
                         print(f"  Using rim_b as reference axis: ({self.rim_reference['x']}, {self.rim_reference['y']})")
                     elif not self.rim_a_detected:
-                        # Only use rim_b if rim_a is not detected, and adjust tracking if rim moved
-                        rim_offset_x = new_rim_reference["x"] - self.rim_reference["x"]
-                        rim_offset_y = new_rim_reference["y"] - self.rim_reference["y"]
-                        if abs(rim_offset_x) > 1 or abs(rim_offset_y) > 1:  # Only adjust if rim moved significantly
-                            # Adjust all existing ball tracking points by the rim movement offset
-                            for i in range(len(self.ball_tracking)):
-                                rel_x, rel_y, frame_num = self.ball_tracking[i]
-                                # Adjust relative coordinates to account for rim movement
-                                self.ball_tracking[i] = (rel_x - rim_offset_x, rel_y - rim_offset_y, frame_num)
-                            self.previous_rim_reference = self.rim_reference.copy()
-                            self.rim_reference = new_rim_reference
-                            print(f"  Rim_b moved: ({self.previous_rim_reference['x']}, {self.previous_rim_reference['y']}) -> ({self.rim_reference['x']}, {self.rim_reference['y']}) | Adjusted {len(self.ball_tracking)} tracking points")
-                        else:
-                            # Small movement, just update reference
-                            self.rim_reference = new_rim_reference
+                        # Only use rim_b if rim_a is not detected - update reference (no need to adjust tracking since we store absolute coordinates)
+                        self.previous_rim_reference = self.rim_reference.copy()
+                        self.rim_reference = new_rim_reference
+                        if abs(new_rim_reference["x"] - self.previous_rim_reference["x"]) > 1 or abs(new_rim_reference["y"] - self.previous_rim_reference["y"]) > 1:
+                            print(f"  Rim_b moved: ({self.previous_rim_reference['x']}, {self.previous_rim_reference['y']}) -> ({self.rim_reference['x']}, {self.rim_reference['y']})")
             
             # Save image if rim detected and not already saved
             # Note: Labels are only drawn in draw_annotations() to avoid duplicates
@@ -896,123 +877,122 @@ class BasketballAnalyzer:
         # Check if ball is definitely below the rim (below the bottom line of the rim)
         is_definitely_below_rim = (ball_y_rel > rim_bottom)
         
-        # When ball is definitely below the rim, check previous 30 frames for goal success
-        if is_definitely_below_rim:
+        # Check if ball is between left and right lines of the rim
+        is_between_left_right = (rim_left <= ball_x_rel <= rim_right)
+        
+        # When ball is below the bottom line of the rim AND between left and right lines, trigger goal checking
+        if is_definitely_below_rim and is_between_left_right:
             # Trigger goal checking
             self.goal_checking_triggered = True
             self.goal_checking_triggered_frame = frame_number
-            
-            # Get all tracking points in previous 30 frames
+        
+        # When goal checking is triggered (ball is below bottom line and between left/right lines),
+        # check previous 30 frames to verify if ball was above upper line and passed through rim
+        if self.goal_checking_triggered:
+            # Get all tracking points in previous 30 frames for the current rim being checked
             previous_30_frames = [f for f in range(max(0, frame_number - 30), frame_number)]
-            tracking_in_previous_30 = [(x_rel, y_rel, track_frame) for x_rel, y_rel, track_frame in self.ball_tracking 
-                                      if track_frame in previous_30_frames]
+            # Determine which rim we're checking against
+            rim_type_to_check = None
+            if rim_location == self.rim_a_location:
+                rim_type_to_check = 'rim_a'
+            elif rim_location == self.rim_b_location:
+                rim_type_to_check = 'rim_b'
             
-            # Get frames where ball was horizontally between top and bottom lines of rim
-            frames_between_rim_lines = []
-            for x_rel, y_rel, track_frame in tracking_in_previous_30:
-                # Check if ball was horizontally aligned with rim (between left and right)
-                if rim_left <= x_rel <= rim_right:
-                    # Check if ball was between top and bottom lines of rim
-                    if rim_top <= y_rel <= rim_bottom:
-                        frames_between_rim_lines.append(track_frame)
+            # Filter tracking data for this rim type and previous 30 frames
+            # Tracking format: (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, rim_type)
+            tracking_in_previous_30 = [t for t in self.ball_tracking 
+                                      if t[0] in previous_30_frames and (rim_type_to_check is None or t[7] == rim_type_to_check)]
             
-            # Log all ratio values for frames where ball is between upper and lower rim lines (from previous 30 frames)
-            # Store ratio values for display in frame
-            self.goal_checking_ratio_values = []
-            previous_30_frames_list = [f for f in range(max(0, frame_number - 30), frame_number)]
-            frames_between_rim_lines_in_30 = sorted([f for f in previous_30_frames_list 
-                                                     if f in self.within_rim_frames and f in self.ball_tracking_ratios])
+            if len(tracking_in_previous_30) < 2:
+                print(f"[Frame {frame_number}] Goal rejected: Not enough tracking data in previous 30 frames")
+                return False, None
             
-            if len(frames_between_rim_lines_in_30) > 0:
-                print(f"[Goal Checking Triggered - Frame {frame_number}] Frames where ball is between rim lines (previous 30 frames): {frames_between_rim_lines_in_30}")
-                ratio_values_log = []
-                for check_frame in frames_between_rim_lines_in_30:
-                    ratio = self.ball_tracking_ratios[check_frame]
-                    ratio_values_log.append(f"Frame {check_frame}: ratio = {ratio:.3f} (abs = {abs(ratio):.3f})")
-                    # Store for display
-                    self.goal_checking_ratio_values.append((check_frame, ratio))
+            # Sort tracking by frame number
+            tracking_in_previous_30.sort(key=lambda x: x[0])
+            
+            # Check if ball was above the upper line of the rim in previous 30 frames
+            # Use rim location from each tracked frame, not current frame
+            ball_was_above_upper_line = False
+            above_upper_line_frames = []
+            
+            for track_data in tracking_in_previous_30:
+                track_frame, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, rim_type = track_data
                 
-                if ratio_values_log:
-                    print(f"[Goal Checking Triggered - Frame {frame_number}] All ratio values (frames between rim lines, previous 30 frames):")
-                    for ratio_log in ratio_values_log:
-                        print(f"  {ratio_log}")
-                else:
-                    print(f"[Goal Checking Triggered - Frame {frame_number}] No ratio values available for frames between rim lines in previous 30 frames")
-            else:
-                # No frames between rim lines in previous 30 frames, clear ratio values
-                self.goal_checking_ratio_values = []
-                print(f"[Goal Checking Triggered - Frame {frame_number}] No frames where ball is between rim lines in previous 30 frames")
-            
-                    # ============================================
-            # Goal Verification Logic:
-            # 1. Check if ball's direction is from above to bottom (downward) in previous 30 frames
-            # 2. Check if ALL ratios of frames where ball is inside rim (from previous 30 frames) are less than 2
-                    # ============================================
-            
-            # Check 1: Ball's direction must be from above to bottom (downward)
-            is_moving_downward = False
-            if len(tracking_in_previous_30) >= 2:
-                # Sort by frame number
-                tracking_in_previous_30.sort(key=lambda x: x[2])
-                # Compare first and last frame in previous 30 frames
-                first_frame_y = tracking_in_previous_30[0][1]  # y position of first frame
-                last_frame_y = tracking_in_previous_30[-1][1]  # y position of last frame
-                is_moving_downward = (last_frame_y > first_frame_y)  # Positive means moving down
-            else:
-                # Not enough tracking data to determine direction
-                print(f"[Frame {frame_number}] Goal rejected: Not enough tracking data in previous 30 frames to determine ball direction")
-                # Don't return early - keep flag set so display can show
-                return False, None
-            
-            if not is_moving_downward:
-                print(f"[Frame {frame_number}] Goal rejected: Ball is not moving from above to bottom in previous 30 frames")
-                # Don't return early - keep flag set so display can show
-                return False, None
-                    
-            # Check 2: ALL ratios of frames where ball is between upper and lower rim lines (from previous 30 frames) must be less than 2
-            all_ratios_valid = True
-            invalid_ratio_frames = []
-            
-            # Get frames in previous 30 frames where ball is between upper and lower rim lines
-            previous_30_frames_list = [f for f in range(max(0, frame_number - 30), frame_number)]
-            frames_between_rim_lines_in_30 = [f for f in previous_30_frames_list 
-                                              if f in self.within_rim_frames and f in self.ball_tracking_ratios]
-            
-            if len(frames_between_rim_lines_in_30) == 0:
-                print(f"[Frame {frame_number}] Goal rejected: No frames where ball is between upper and lower rim lines in previous 30 frames with ratio values")
-                return False, None
-            
-            # Check all ratios for frames where ball is between rim lines (from previous 30 frames)
-            for check_frame in frames_between_rim_lines_in_30:
-                ratio = self.ball_tracking_ratios[check_frame]
-                if abs(ratio) >= 2:
-                    all_ratios_valid = False
-                    invalid_ratio_frames.append((check_frame, ratio))
-            
-            if all_ratios_valid and len(invalid_ratio_frames) == 0:
-                # Goal success! Both conditions met:
-                # 1. Ball is moving from above to bottom
-                # 2. ALL ratios of frames where ball is between rim lines (from previous 30 frames) are < 2
-                # Avoid duplicate detections
-                if hasattr(self, 'last_goal_frame') and self.last_goal_frame is not None:
-                    if frame_number - self.last_goal_frame < 20:  # Within 20 frames of last goal
-                        return False, None  # Likely duplicate detection
+                # Calculate rim boundaries using rim location from this frame
+                rim_top = rim_y - rim_height // 2
+                rim_bottom = rim_y + rim_height // 2
+                rim_left = rim_x - rim_width // 2
+                rim_right = rim_x + rim_width // 2
                 
-                self.last_goal_frame = frame_number
-                print(f"[Goal Success Detected] Ball is definitely below rim at frame {frame_number}. "
-                      f"Ball moving from above to bottom: ✓, All ratios for frames between rim lines (previous 30 frames) < 2: ✓ "
-                      f"(checked {len(frames_between_rim_lines_in_30)} frames). Rim: {rim_team}")
-                # Clear the tracking after goal detection
-                self.inside_rim_horizontal_frames = []
-                self.within_rim_frames = []
-                self.goal_checking_triggered = False
-                self.goal_checking_triggered_frame = None
-                self.goal_checking_ratio_values = []  # Clear ratio values
-                return True, rim_team
-            else:
-                # Some frames have ratio >= 2, not a successful goal
-                if len(invalid_ratio_frames) > 0:
-                    print(f"[Frame {frame_number}] Goal rejected: Ball is below rim, moving downward ✓, but ratio >= 2 at frames between rim lines: {invalid_ratio_frames}")
+                # Check if ball was above upper line and between left/right lines using THIS frame's rim location
+                is_above = (ball_y < rim_top)
+                is_between = (rim_left <= ball_x <= rim_right)
+                
+                if is_above and is_between:
+                    ball_was_above_upper_line = True
+                    above_upper_line_frames.append(track_frame)
+            
+            if not ball_was_above_upper_line:
+                print(f"[Frame {frame_number}] Goal rejected: Ball was not above upper line of rim in previous 30 frames")
+                return False, None
+            
+            # Check if ball passed through rim (between upper and lower lines) while between left/right lines
+            ball_passed_through_rim = False
+            through_rim_frames = []
+            for track_data in tracking_in_previous_30:
+                track_frame, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, rim_type = track_data
+                
+                # Calculate rim boundaries using rim location from this frame
+                rim_top = rim_y - rim_height // 2
+                rim_bottom = rim_y + rim_height // 2
+                rim_left = rim_x - rim_width // 2
+                rim_right = rim_x + rim_width // 2
+                
+                # Check if ball was between upper and lower lines and between left and right lines
+                if (rim_top <= ball_y <= rim_bottom) and (rim_left <= ball_x <= rim_right):
+                    ball_passed_through_rim = True
+                    through_rim_frames.append(track_frame)
+            
+            if not ball_passed_through_rim:
+                print(f"[Frame {frame_number}] Goal rejected: Ball did not pass through rim (between upper and lower lines) in previous 30 frames")
+                return False, None
+            
+            # Verify the sequence: ball was above upper line, then passed through rim
+            # Get earliest frame where ball was above upper line
+            earliest_above_frame = min(above_upper_line_frames) if above_upper_line_frames else None
+            # Get earliest frame where ball passed through rim
+            earliest_through_frame = min(through_rim_frames) if through_rim_frames else None
+            
+            if earliest_above_frame is None or earliest_through_frame is None:
+                print(f"[Frame {frame_number}] Goal rejected: Could not determine sequence of ball movement")
+                return False, None
+            
+            # Ball should be above upper line first, then pass through rim
+            if earliest_through_frame < earliest_above_frame:
+                print(f"[Frame {frame_number}] Goal rejected: Ball passed through rim before being above upper line")
+                return False, None
+            
+            # Goal success! All conditions met:
+            # 1. Ball was above upper line of rim
+            # 2. Ball passed through rim (between upper and lower lines)
+            # 3. Ball was between left and right lines during this passage
+            # Avoid duplicate detections
+            if hasattr(self, 'last_goal_frame') and self.last_goal_frame is not None:
+                if frame_number - self.last_goal_frame < 30:  # Within 30 frames of last goal
+                    return False, None  # Likely duplicate detection
+            
+            self.last_goal_frame = frame_number
+            print(f"[Goal Success Detected] Ball is below rim at frame {frame_number}. "
+                  f"Ball was above upper line: ✓ (frames: {above_upper_line_frames}), "
+                  f"Ball passed through rim: ✓ (frames: {through_rim_frames}), "
+                  f"Ball was between left/right lines: ✓. Rim: {rim_team}")
+            # Clear the tracking after goal detection
+            self.inside_rim_horizontal_frames = []
+            self.within_rim_frames = []
+            self.goal_checking_triggered = False
+            self.goal_checking_triggered_frame = None
+            self.goal_checking_ratio_values = []  # Clear ratio values
+            return True, rim_team
         
         # Track frames where ball is within rim's vertical boundaries (between upper and lower rim lines)
         # Check if ball is within rim's vertical boundaries (between upper and lower rim lines)
@@ -1085,21 +1065,31 @@ class BasketballAnalyzer:
         if ball_position:
             print(f"  Ball detected at: {ball_position}")
             # Track ball in every frame (from first detection to current frame)
-            # Use rim location as reference axis (relative coordinates)
+            # Store both ball location and rim location for each frame
             if self.ball_location is not None:
                 ball_x = int(self.ball_location[0])
                 ball_y = int(self.ball_location[1])
                 
-                # Convert to relative coordinates using rim as reference
-                if self.rim_reference is not None:
-                    rel_x = ball_x - self.rim_reference["x"]
-                    rel_y = ball_y - self.rim_reference["y"]
-                    tracked_point = (rel_x, rel_y, frame_number)
-                else:
-                    # Fallback to absolute coordinates if no rim reference
-                    tracked_point = (ball_x, ball_y, frame_number)
+                # Track against rim_a if detected
+                if self.rim_a_detected and self.rim_a_location is not None:
+                    rim_x = self.rim_a_location["x"]
+                    rim_y = self.rim_a_location["y"]
+                    rim_width = self.rim_a_location["w"]
+                    rim_height = self.rim_a_location["h"]
+                    tracked_point = (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, 'rim_a')
+                    self.ball_tracking.append(tracked_point)
                 
-                self.ball_tracking.append(tracked_point)
+                # Track against rim_b if detected
+                if self.rim_b_detected and self.rim_b_location is not None:
+                    rim_x = self.rim_b_location["x"]
+                    rim_y = self.rim_b_location["y"]
+                    rim_width = self.rim_b_location["w"]
+                    rim_height = self.rim_b_location["h"]
+                    tracked_point = (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, 'rim_b')
+                    self.ball_tracking.append(tracked_point)
+                
+                # Keep only last 30 frames of tracking data
+                self.ball_tracking = [t for t in self.ball_tracking if frame_number - t[0] <= 30]
                 
                 # Calculate and store ratio for this frame
                 # Use the closest rim (rim_a or rim_b) for ratio calculation
@@ -1119,7 +1109,7 @@ class BasketballAnalyzer:
                 if ratio is not None:
                     self.ball_tracking_ratios[frame_number] = ratio
                 
-                print(f"  Ball tracked (relative to rim): {tracked_point} | Total tracking points: {len(self.ball_tracking)}")
+                print(f"  Ball tracked: frame={frame_number} | Total tracking points: {len(self.ball_tracking)}")
         else:
             print("  Ball not detected")
         
@@ -1267,21 +1257,31 @@ class BasketballAnalyzer:
             ball_position = self.detect_ball(frame, frame_number=frame_number, save_image=True, fps=fps)
             
             # Track ball in every frame (from first detection to current frame)
-            # Use rim location as reference axis (relative coordinates)
+            # Store both ball location and rim location for each frame
             if self.ball_location is not None:
                 ball_x = int(self.ball_location[0])
                 ball_y = int(self.ball_location[1])
                 
-                # Convert to relative coordinates using rim as reference
-                if self.rim_reference is not None:
-                    rel_x = ball_x - self.rim_reference["x"]
-                    rel_y = ball_y - self.rim_reference["y"]
-                    tracked_point = (rel_x, rel_y, frame_number)
-                else:
-                    # Fallback to absolute coordinates if no rim reference
-                    tracked_point = (ball_x, ball_y, frame_number)
+                # Track against rim_a if detected
+                if self.rim_a_detected and self.rim_a_location is not None:
+                    rim_x = self.rim_a_location["x"]
+                    rim_y = self.rim_a_location["y"]
+                    rim_width = self.rim_a_location["w"]
+                    rim_height = self.rim_a_location["h"]
+                    tracked_point = (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, 'rim_a')
+                    self.ball_tracking.append(tracked_point)
                 
-                self.ball_tracking.append(tracked_point)
+                # Track against rim_b if detected
+                if self.rim_b_detected and self.rim_b_location is not None:
+                    rim_x = self.rim_b_location["x"]
+                    rim_y = self.rim_b_location["y"]
+                    rim_width = self.rim_b_location["w"]
+                    rim_height = self.rim_b_location["h"]
+                    tracked_point = (frame_number, ball_x, ball_y, rim_x, rim_y, rim_width, rim_height, 'rim_b')
+                    self.ball_tracking.append(tracked_point)
+                
+                # Keep only last 30 frames of tracking data
+                self.ball_tracking = [t for t in self.ball_tracking if frame_number - t[0] <= 30]
                 
                 # Calculate and store ratio for this frame
                 # Use the closest rim (rim_a or rim_b) for ratio calculation
@@ -1302,7 +1302,7 @@ class BasketballAnalyzer:
                     self.ball_tracking_ratios[frame_number] = ratio
                 
                 # Log ball tracking data
-                print(f"[Frame {frame_number}] Ball tracked (relative to rim): {tracked_point} | Total tracking points: {len(self.ball_tracking)}")
+                print(f"[Frame {frame_number}] Ball tracked: frame={frame_number} | Total tracking points: {len(self.ball_tracking)}")
             
             # Check for goal
             goal_scored, team = self.check_goal(frame_number)
@@ -1498,6 +1498,85 @@ class BasketballAnalyzer:
             elif frame_number > self.recent_goal['display_until']:
                 # Clear recent goal if display time expired
                 self.recent_goal = None
+        
+        # Display ball position status relative to rim for each frame
+        if self.ball_location is not None:
+            display_y = 80  # Start position for status display
+            line_height = 25  # Height between lines
+            
+            ball_x = int(self.ball_location[0])
+            ball_y = int(self.ball_location[1])
+            
+            # Check against rim_a
+            if self.rim_a_location is not None:
+                rim_x = self.rim_a_location["x"]
+                rim_y = self.rim_a_location["y"]
+                rim_width = self.rim_a_location["w"]
+                rim_height = self.rim_a_location["h"]
+                
+                # Convert to relative coordinates if rim_reference exists, otherwise use absolute
+                if self.rim_reference is not None:
+                    rim_x_rel = rim_x - self.rim_reference["x"]
+                    rim_y_rel = rim_y - self.rim_reference["y"]
+                    ball_x_rel = ball_x - self.rim_reference["x"]
+                    ball_y_rel = ball_y - self.rim_reference["y"]
+                else:
+                    rim_x_rel = rim_x
+                    rim_y_rel = rim_y
+                    ball_x_rel = ball_x
+                    ball_y_rel = ball_y
+                
+                rim_top = rim_y_rel - rim_height // 2
+                rim_left = rim_x_rel - rim_width // 2
+                rim_right = rim_x_rel + rim_width // 2
+                
+                # Check conditions
+                is_above_upper_line = (ball_y_rel < rim_top)
+                is_between_left_right = (rim_left <= ball_x_rel <= rim_right)
+                
+                # Display status for rim_a
+                status_text = f"rim_a: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
+                color = (0, 255, 0) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
+                cv2.putText(annotated, status_text, (10, display_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
+                cv2.putText(annotated, status_text, (10, display_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
+                display_y += line_height
+            
+            # Check against rim_b
+            if self.rim_b_location is not None:
+                rim_x = self.rim_b_location["x"]
+                rim_y = self.rim_b_location["y"]
+                rim_width = self.rim_b_location["w"]
+                rim_height = self.rim_b_location["h"]
+                
+                # Convert to relative coordinates if rim_reference exists, otherwise use absolute
+                if self.rim_reference is not None:
+                    rim_x_rel = rim_x - self.rim_reference["x"]
+                    rim_y_rel = rim_y - self.rim_reference["y"]
+                    ball_x_rel = ball_x - self.rim_reference["x"]
+                    ball_y_rel = ball_y - self.rim_reference["y"]
+                else:
+                    rim_x_rel = rim_x
+                    rim_y_rel = rim_y
+                    ball_x_rel = ball_x
+                    ball_y_rel = ball_y
+                
+                rim_top = rim_y_rel - rim_height // 2
+                rim_left = rim_x_rel - rim_width // 2
+                rim_right = rim_x_rel + rim_width // 2
+                
+                # Check conditions
+                is_above_upper_line = (ball_y_rel < rim_top)
+                is_between_left_right = (rim_left <= ball_x_rel <= rim_right)
+                
+                # Display status for rim_b
+                status_text = f"rim_b: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
+                color = (0, 255, 255) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
+                cv2.putText(annotated, status_text, (10, display_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
+                cv2.putText(annotated, status_text, (10, display_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
         
         # Calculate and display horizontal distance from ball to rim in every frame
         # Display distance whenever both ball and rim are detected
@@ -1708,7 +1787,7 @@ class BasketballAnalyzer:
         
         # Display "Goal checking triggered" when goal checking logic is triggered
         if self.goal_checking_triggered:
-            goal_checking_text = ""
+            goal_checking_text = "goal checking functionality is triggered"
             (gc_text_width, gc_text_height), baseline = cv2.getTextSize(
                 goal_checking_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2
             )
@@ -1717,6 +1796,11 @@ class BasketballAnalyzer:
             gc_text_x = (frame_width - gc_text_width) // 2
             gc_text_y = 50
             
+            # Draw the goal checking text with outline for visibility
+            cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)  # Black outline
+            cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)  # Yellow text
             
             # Display ratio values for frames where ball is between upper and lower rim lines
             if len(self.goal_checking_ratio_values) > 0:
@@ -1959,7 +2043,7 @@ def main():
     parser.add_argument('--output', type=str, default=None,
                        help='Path to save annotated output video/image (optional)')
     parser.add_argument('--confidence', type=float, default=0.3,
-                       help='Confidence threshold for detections (default: 0.3)')
+                       help='Confidence threshold for detections (default: 0.5)')
     parser.add_argument('--device', type=str, default=None,
                        help='Device to use: "cuda", "cpu", or None for auto-detect (default: None)')
     parser.add_argument('--use-yolov8n-ball', action='store_true',
@@ -2023,11 +2107,23 @@ def main():
             output_dir.mkdir(parents=True, exist_ok=True)
         
         # Process each image with frame numbers for ball tracking
+        # Extract frame numbers from filenames (e.g., frame_000844.jpg -> 844)
         for i, image_file in enumerate(image_files):
             print(f"\n[{i+1}/{len(image_files)}] Processing: {image_file.name}")
             output_path = output_dir / f"detected_{image_file.name}" if output_dir else None
+            
+            # Extract frame number from filename (e.g., frame_000844.jpg -> 844)
+            # Try to match pattern like "frame_XXXXXX.jpg" or "frame_XXXXXX"
+            frame_match = re.search(r'frame[_\s]*(\d+)', image_file.name, re.IGNORECASE)
+            if frame_match:
+                frame_number = int(frame_match.group(1))
+            else:
+                # Fallback to enumerate index if no frame number found in filename
+                frame_number = i
+                print(f"  Warning: Could not extract frame number from filename, using index {i}")
+            
             # Process image with frame number for continuous ball tracking
-            analyzer.process_image(str(image_file), str(output_path) if output_path else None, frame_number=i)
+            analyzer.process_image(str(image_file), str(output_path) if output_path else None, frame_number=frame_number)
     
     return analyzer
 
