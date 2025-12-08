@@ -102,8 +102,8 @@ def main():
     parser.add_argument(
         '--input_dir',
         type=str,
-        default='output_images_old',
-        help='Input directory containing frame images (default: output_images_old)'
+        default='output_images',
+        help='Input directory containing frame images (default: output_images)'
     )
     parser.add_argument(
         '--output',

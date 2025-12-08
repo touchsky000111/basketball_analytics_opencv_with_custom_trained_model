@@ -885,7 +885,7 @@ class BasketballAnalyzer:
             # Trigger goal checking
             self.goal_checking_triggered = True
             self.goal_checking_triggered_frame = frame_number
-        
+            
         # When goal checking is triggered (ball is below bottom line and between left/right lines),
         # check previous 30 frames to verify if ball was above upper line and passed through rim
         if self.goal_checking_triggered:
@@ -935,7 +935,7 @@ class BasketballAnalyzer:
             if not ball_was_above_upper_line:
                 print(f"[Frame {frame_number}] Goal rejected: Ball was not above upper line of rim in previous 30 frames")
                 return False, None
-            
+                    
             # Check if ball passed through rim (between upper and lower lines) while between left/right lines
             ball_passed_through_rim = False
             through_rim_frames = []
@@ -1534,14 +1534,14 @@ class BasketballAnalyzer:
                 is_above_upper_line = (ball_y_rel < rim_top)
                 is_between_left_right = (rim_left <= ball_x_rel <= rim_right)
                 
-                # Display status for rim_a
-                status_text = f"rim_a: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
-                color = (0, 255, 0) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
-                cv2.putText(annotated, status_text, (10, display_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
-                cv2.putText(annotated, status_text, (10, display_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
-                display_y += line_height
+                # # Display status for rim_a
+                # status_text = f"rim_a: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
+                # color = (0, 255, 0) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
+                # cv2.putText(annotated, status_text, (10, display_y), 
+                #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
+                # cv2.putText(annotated, status_text, (10, display_y), 
+                #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
+                # display_y += line_height
             
             # Check against rim_b
             if self.rim_b_location is not None:
@@ -1570,13 +1570,13 @@ class BasketballAnalyzer:
                 is_above_upper_line = (ball_y_rel < rim_top)
                 is_between_left_right = (rim_left <= ball_x_rel <= rim_right)
                 
-                # Display status for rim_b
-                status_text = f"rim_b: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
-                color = (0, 255, 255) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
-                cv2.putText(annotated, status_text, (10, display_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
-                cv2.putText(annotated, status_text, (10, display_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
+                # # Display status for rim_b
+                # status_text = f"rim_b: Above upper line: {'YES' if is_above_upper_line else 'NO'}, Between left/right: {'YES' if is_between_left_right else 'NO'}"
+                # color = (0, 255, 255) if (is_above_upper_line and is_between_left_right) else (255, 255, 255)
+                # cv2.putText(annotated, status_text, (10, display_y), 
+                #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # Black outline
+                # cv2.putText(annotated, status_text, (10, display_y), 
+                #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)  # Colored text
         
         # Calculate and display horizontal distance from ball to rim in every frame
         # Display distance whenever both ball and rim are detected
@@ -1796,11 +1796,11 @@ class BasketballAnalyzer:
             gc_text_x = (frame_width - gc_text_width) // 2
             gc_text_y = 50
             
-            # Draw the goal checking text with outline for visibility
-            cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)  # Black outline
-            cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)  # Yellow text
+            # # Draw the goal checking text with outline for visibility
+            # cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
+            #            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)  # Black outline
+            # cv2.putText(annotated, goal_checking_text, (gc_text_x, gc_text_y), 
+            #            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)  # Yellow text
             
             # Display ratio values for frames where ball is between upper and lower rim lines
             if len(self.goal_checking_ratio_values) > 0:
