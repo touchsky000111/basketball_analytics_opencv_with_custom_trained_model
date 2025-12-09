@@ -463,7 +463,7 @@ class BasketballAnalyzer:
                         color = (0, 255, 255)  # Yellow for rim_b (BGR format)
                         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
                     
-                    self.save_detection_image(annotated_frame, "rim", frame_number, fps)
+                    # self.save_detection_image(annotated_frame, "rim", frame_number, fps)
                     self.rim_image_saved = True
                     self.rim_image_saved_frame = frame_number
             
@@ -509,7 +509,7 @@ class BasketballAnalyzer:
                                    (x, y - 10),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         
-                        self.save_detection_image(annotated_frame, "ball", frame_number, fps)
+                        # self.save_detection_image(annotated_frame, "ball", frame_number, fps)
                         self.last_ball_image_frame = frame_number
                 
                 return ball_position
@@ -537,7 +537,7 @@ class BasketballAnalyzer:
                                    (ball_position[0] - 50, ball_position[1] - 20),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         
-                        self.save_detection_image(annotated_frame, "ball", frame_number, fps)
+                        # self.save_detection_image(annotated_frame, "ball", frame_number, fps)
                         self.last_ball_image_frame = frame_number
                 
                 return ball_position
