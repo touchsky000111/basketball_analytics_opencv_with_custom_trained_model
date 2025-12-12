@@ -328,17 +328,13 @@ class BasketballAnalyzer:
             detection_type: 'rim' or 'ball'
             frame_number: Current frame number
             fps: Frames per second
+        
+        Note: This function is currently not used in the main pipeline.
+        Detection images are saved to output_images directory during processing.
         """
-        output_dir = Path("output")
-        output_dir.mkdir(exist_ok=True)
-        
-        timestamp = frame_number / fps if fps > 0 else 0
-        filename = f"{detection_type}_detected_frame_{frame_number:06d}_time_{timestamp:.2f}s.jpg"
-        filepath = output_dir / filename
-        
-        cv2.imwrite(str(filepath), frame)
-        print(f"  → Saved {detection_type} detection image: {filename}")
-        return filepath
+        # Function kept for compatibility but does not create output directory
+        # All calls to this function are currently commented out
+        return None
     
     def detect_rim(self, frame, frame_number=None, save_image=True, fps=30):
         """
@@ -502,12 +498,12 @@ class BasketballAnalyzer:
                 # Save image if ball detected (with interval to avoid too many images)
                 if save_image and frame_number is not None:
                     if frame_number - self.last_ball_image_frame >= self.ball_image_save_interval:
-                        # Draw ball annotation on frame before saving
-                        annotated_frame = frame.copy()
-                        cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                        cv2.putText(annotated_frame, f"basketball {confidence:.2f}", 
-                                   (x, y - 10),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        # # Draw ball annotation on frame before saving
+                        # annotated_frame = frame.copy()
+                        # cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                        # cv2.putText(annotated_frame, f"basketball {confidence:.2f}", 
+                        #            (x, y - 10),
+                        #            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         
                         # self.save_detection_image(annotated_frame, "ball", frame_number, fps)
                         self.last_ball_image_frame = frame_number
@@ -531,11 +527,8 @@ class BasketballAnalyzer:
                     if frame_number - self.last_ball_image_frame >= self.ball_image_save_interval:
                         # Draw ball annotation on frame before saving
                         annotated_frame = frame.copy()
-                        cv2.circle(annotated_frame, ball_position, 10, (0, 0, 255), -1)
-                        cv2.circle(annotated_frame, ball_position, 15, (0, 0, 255), 2)
-                        cv2.putText(annotated_frame, "basketball", 
-                                   (ball_position[0] - 50, ball_position[1] - 20),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        # cv2.circle(annotated_frame, ball_position, 10, (0, 0, 255), -1)
+                        # cv2.circle(annotated_frame, ball_position, 15, (0, 0, 255), 2)
                         
                         # self.save_detection_image(annotated_frame, "ball", frame_number, fps)
                         self.last_ball_image_frame = frame_number
@@ -1468,34 +1461,16 @@ class BasketballAnalyzer:
             conf = player['confidence']
             cls_name = player.get('class_name', 'Player')
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 255, 0), 2)
-            label = f"{cls_name}: {conf:.2f}"
-            cv2.putText(annotated, label, 
-                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
         
-        # Draw shot detection indicator
-        if self.shot_detected:
-            cv2.putText(annotated, "Shot Detected", (10, 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        # Draw shot detection indicator (removed text annotation)
+        # if self.shot_detected:
+        #     cv2.putText(annotated, "Shot Detected", (10, 50), 
+        #                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         
         # Draw goal notification if recent goal detected (display for 30 frames)
+        # Text annotation removed
         if self.recent_goal is not None and frame_number is not None:
-            if frame_number >= self.recent_goal['frame'] and frame_number <= self.recent_goal['display_until']:
-                goal_text = f"GOAL! {self.recent_goal['team']}"
-                # Get frame dimensions for centering
-                frame_height, frame_width = annotated.shape[:2]
-                # Calculate text size for centering
-                (text_width, text_height), baseline = cv2.getTextSize(
-                    goal_text, cv2.FONT_HERSHEY_SIMPLEX, 2, 4
-                )
-                text_x = (frame_width - text_width) // 2
-                text_y = (frame_height + text_height) // 2
-                
-                # Draw text with outline (shadow effect)
-                cv2.putText(annotated, goal_text, (text_x, text_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 6)  # Black outline
-                cv2.putText(annotated, goal_text, (text_x, text_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4)  # Green text
-            elif frame_number > self.recent_goal['display_until']:
+            if frame_number > self.recent_goal['display_until']:
                 # Clear recent goal if display time expired
                 self.recent_goal = None
         
@@ -2016,12 +1991,12 @@ class BasketballAnalyzer:
                 #     1
                 # )
         
-        # Draw score
-        score_text = f"Team A: {self.team_goals['Team A']}  |  Team B: {self.team_goals['Team B']}"
-        cv2.putText(annotated, score_text, (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
-        cv2.putText(annotated, score_text, (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+        # Draw score (text annotation removed)
+        # score_text = f"Team A: {self.team_goals['Team A']}  |  Team B: {self.team_goals['Team B']}"
+        # cv2.putText(annotated, score_text, (10, 30), 
+        #            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
+        # cv2.putText(annotated, score_text, (10, 30), 
+        #            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
         
         return annotated
 

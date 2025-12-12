@@ -297,6 +297,151 @@ def generate_video(input_dir, output_path, fps=30.0):
     return True
 
 
+def generate_goal_clips(goal_history, analyzed_frames_dir, output_dir, fps, clip_duration_before=3.0, clip_duration_after=2.0):
+    """
+    Generate individual video clips for each goal event.
+    
+    Args:
+        goal_history: List of goal events with 'frame', 'team', 'time' keys
+        analyzed_frames_dir: Directory containing analyzed frame images
+        output_dir: Directory to save goal clips
+        fps: Frames per second
+        clip_duration_before: Seconds before goal to include (default: 3.0)
+        clip_duration_after: Seconds after goal to include (default: 2.0)
+    
+    Returns:
+        List of created clip file paths
+    """
+    if not goal_history:
+        print("No goals detected, skipping goal clip generation")
+        return []
+    
+    print("\n" + "="*60)
+    print("STEP 4: GENERATING GOAL CLIPS")
+    print("="*60)
+    
+    analyzed_frames_path = Path(analyzed_frames_dir)
+    if not analyzed_frames_path.exists():
+        print(f"Error: Analyzed frames directory not found: {analyzed_frames_dir}")
+        return []
+    
+    # Get all analyzed frame files sorted by frame number
+    frame_files = []
+    for file_path in analyzed_frames_path.glob("*.jpg"):
+        frame_files.append(file_path)
+    
+    if len(frame_files) == 0:
+        print(f"Error: No frame files found in {analyzed_frames_dir}")
+        return []
+    
+    # Sort by frame number
+    frame_files.sort(key=lambda x: natural_sort_key(x.name))
+    
+    # Create a mapping of frame number to file path
+    frame_to_file = {}
+    for frame_file in frame_files:
+        # Extract frame number from filename (e.g., detected_frame_000844.jpg -> 844)
+        frame_match = re.search(r'frame[_\s]*(\d+)', frame_file.name, re.IGNORECASE)
+        if frame_match:
+            frame_num = int(frame_match.group(1))
+            frame_to_file[frame_num] = frame_file
+    
+    # Create output directory
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Track goal counts per team
+    team_goal_counts = {'Team A': 0, 'Team B': 0}
+    
+    # Get frame dimensions from first frame
+    first_frame = cv2.imread(str(frame_files[0]))
+    if first_frame is None:
+        print(f"Error: Could not read first frame")
+        return []
+    
+    height, width = first_frame.shape[:2]
+    
+    # Define codec
+    codecs_to_try = [
+        ('mp4v', cv2.VideoWriter_fourcc(*'mp4v')),
+        ('XVID', cv2.VideoWriter_fourcc(*'XVID')),
+        ('MJPG', cv2.VideoWriter_fourcc(*'MJPG')),
+    ]
+    
+    created_clips = []
+    
+    print(f"Generating {len(goal_history)} goal clips...")
+    
+    for goal in goal_history:
+        goal_frame = goal['frame']
+        goal_team = goal['team']
+        
+        # Increment goal count for this team
+        team_goal_counts[goal_team] += 1
+        goal_number = team_goal_counts[goal_team]
+        
+        # Create clip filename (normalize team name: "Team A" -> "team_a", "Team B" -> "team_b")
+        team_name_normalized = goal_team.lower().replace(' ', '_')
+        clip_filename = f"{team_name_normalized}_goal_{goal_number}.mp4"
+        clip_path = output_path / clip_filename
+        
+        # Calculate frame range for clip
+        frames_before = int(clip_duration_before * fps)
+        frames_after = int(clip_duration_after * fps)
+        start_frame = max(0, goal_frame - frames_before)
+        end_frame = goal_frame + frames_after
+        
+        # Collect frames for this clip
+        clip_frames = []
+        for frame_num in range(start_frame, end_frame + 1):
+            if frame_num in frame_to_file:
+                clip_frames.append((frame_num, frame_to_file[frame_num]))
+        
+        if not clip_frames:
+            print(f"  Warning: No frames found for goal at frame {goal_frame}, skipping...")
+            continue
+        
+        # Sort frames by frame number
+        clip_frames.sort(key=lambda x: x[0])
+        
+        # Create video writer
+        out = None
+        codec_name = None
+        for name, fourcc in codecs_to_try:
+            out = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+            if out.isOpened():
+                codec_name = name
+                break
+            else:
+                out.release()
+                out = None
+        
+        if out is None or not out.isOpened():
+            print(f"  Error: Could not create video writer for {clip_path}")
+            continue
+        
+        # Write frames to clip
+        for frame_num, frame_file in clip_frames:
+            frame = cv2.imread(str(frame_file))
+            if frame is None:
+                continue
+            
+            # Resize if needed
+            if frame.shape[:2] != (height, width):
+                frame = cv2.resize(frame, (width, height))
+            
+            out.write(frame)
+        
+        out.release()
+        created_clips.append(clip_path)
+        print(f"  ✓ Created: {clip_filename} (frames {start_frame}-{end_frame}, goal at frame {goal_frame})")
+    
+    print(f"\nGoal clips generation complete!")
+    print(f"  Total clips created: {len(created_clips)}")
+    
+    return created_clips
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Complete basketball video processing pipeline: extract frames -> analyze -> generate video',
@@ -320,8 +465,8 @@ Examples:
     # Input/Output arguments
     parser.add_argument('--video', type=str, required=True,
                        help='Path to input video file')
-    parser.add_argument('--output', type=str, required=True,
-                       help='Path to output video file')
+    parser.add_argument('--output', type=str, default=None,
+                       help='Path to output video file (optional, goal clips will be generated automatically)')
     
     # Frame extraction arguments
     parser.add_argument('--interval', type=int, default=1,
@@ -453,17 +598,34 @@ Examples:
             cleanup_intermediate_dirs()
             return 1
         
-        # STEP 3: Generate output video
-        success = generate_video(
-            input_dir=args.output_images_dir,
-            output_path=args.output,
+        # STEP 3: Generate output video (optional, only if output path is provided)
+        if args.output:
+            success = generate_video(
+                input_dir=args.output_images_dir,
+                output_path=args.output,
+                fps=fps
+            )
+            
+            if not success:
+                print("Error: Video generation failed")
+                cleanup_intermediate_dirs()
+                return 1
+        
+        # STEP 4: Generate goal clips
+        # Determine output directory for goal clips (use same directory as main output, or create 'goal_clips' subdirectory)
+        if args.output:
+            output_path_obj = Path(args.output)
+            goal_clips_dir = output_path_obj.parent / "goal_clips"
+        else:
+            # If no output specified, create goal_clips in current directory
+            goal_clips_dir = Path("goal_clips")
+        
+        goal_clips = generate_goal_clips(
+            goal_history=analyzer.goal_history,
+            analyzed_frames_dir=args.output_images_dir,
+            output_dir=str(goal_clips_dir),
             fps=fps
         )
-        
-        if not success:
-            print("Error: Video generation failed")
-            cleanup_intermediate_dirs()
-            return 1
         
         # Cleanup intermediate files (delete by default, unless --keep-intermediate is used)
         cleanup_intermediate_dirs()
@@ -473,7 +635,8 @@ Examples:
         print("PROCESSING COMPLETE!")
         print("="*60)
         print(f"Input video: {args.video}")
-        print(f"Output video: {args.output}")
+        if args.output:
+            print(f"Output video: {args.output}")
         print(f"Frames extracted: {saved_count}")
         print(f"Frames analyzed: {frames_processed}")
         print(f"Team A Goals: {analyzer.team_goals['Team A']}")
@@ -482,6 +645,10 @@ Examples:
         print("\nGoal Events:")
         for goal in analyzer.goal_history:
             print(f"  Frame {goal['frame']} ({goal['time']:.2f}s): {goal['team']}")
+        if goal_clips:
+            print(f"\nGoal Clips Created ({len(goal_clips)}):")
+            for clip_path in goal_clips:
+                print(f"  - {clip_path.name}")
         
         return 0
         

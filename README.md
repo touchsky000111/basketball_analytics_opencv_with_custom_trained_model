@@ -10,6 +10,7 @@ A comprehensive basketball video analysis system that automatically detects ball
 - 🎯 **Goal Detection**: Automatically counts goals for Team A and Team B
 - 📊 **Video Processing**: Complete pipeline from video input to annotated output
 - 🎥 **Frame-by-Frame Analysis**: Detailed analysis with tracking and annotations
+- 🎬 **Goal Clips**: Automatically generates individual video clips for each goal event
 
 ## Installation
 
@@ -35,15 +36,19 @@ This will:
 1. Extract frames from the input video
 2. Analyze each frame for ball, rim, and player detection
 3. Detect and count goals
-4. Generate an annotated output video
-5. Automatically clean up intermediate files
+4. Generate an annotated output video (optional)
+5. **Automatically create individual goal clips** (e.g., `team_a_goal_1.mp4`, `team_b_goal_1.mp4`)
+6. Automatically clean up intermediate files
 
 ## Command Line Arguments
 
 ### Required Arguments
 
 - `--video`: Path to input video file
-- `--output`: Path to output video file
+
+### Optional Arguments
+
+- `--output`: Path to output video file (optional - goal clips are generated automatically)
 
 ### Frame Extraction Options
 
@@ -73,9 +78,14 @@ This will:
 
 ## Usage Examples
 
-### Process entire video
+### Process entire video (with full output video)
 ```bash
 python main.py --video input/input_video.mp4 --output output/video.mp4
+```
+
+### Process video and generate only goal clips (no full video)
+```bash
+python main.py --video input/input_video.mp4
 ```
 
 ### Process with custom confidence threshold
@@ -144,17 +154,20 @@ The processing pipeline consists of three main steps:
 ## Output
 
 The script provides:
-- Annotated output video with:
+- **Goal Clips** (automatically generated in `goal_clips/` directory):
+  - Individual video clips for each goal event
+  - Naming: `team_a_goal_1.mp4`, `team_a_goal_2.mp4`, `team_b_goal_1.mp4`, etc.
+  - Each clip includes 3 seconds before and 2 seconds after the goal
+- Annotated output video (optional, if `--output` is specified) with:
   - Ball detection (red circle)
   - Rim detection (green/yellow boxes)
   - Player detection (cyan boxes)
-  - Score display (Team A vs Team B)
-  - Goal notifications
 - Console output with:
   - Processing progress
   - Goal detection results
   - Final score summary
   - Goal event timeline
+  - List of created goal clips
 
 ## Requirements
 
