@@ -443,25 +443,26 @@ class BasketballAnalyzer:
             
             # Save image if rim detected and not already saved
             # Note: Labels are only drawn in draw_annotations() to avoid duplicates
-            if save_image and frame_number is not None:
-                if not self.rim_image_saved or (frame_number - self.rim_image_saved_frame > 300):
-                    annotated_frame = frame.copy()
-                    
-                    # Draw rim_a bounding box only (no label to avoid duplicates)
-                    if self.rim_a_detected and self.rim_a_bounding_box is not None:
-                        x1, y1, x2, y2 = self.rim_a_bounding_box
-                        color = (0, 255, 0)  # Green for rim_a (BGR format)
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
-                    
-                    # Draw rim_b bounding box only (no label to avoid duplicates)
-                    if self.rim_b_detected and self.rim_b_bounding_box is not None:
-                        x1, y1, x2, y2 = self.rim_b_bounding_box
-                        color = (0, 255, 255)  # Yellow for rim_b (BGR format)
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
-                    
-                    # self.save_detection_image(annotated_frame, "rim", frame_number, fps)
-                    self.rim_image_saved = True
-                    self.rim_image_saved_frame = frame_number
+            # DISABLED: Visual annotations removed
+            # if save_image and frame_number is not None:
+            #     if not self.rim_image_saved or (frame_number - self.rim_image_saved_frame > 300):
+            #         annotated_frame = frame.copy()
+            #         
+            #         # Draw rim_a bounding box only (no label to avoid duplicates)
+            #         if self.rim_a_detected and self.rim_a_bounding_box is not None:
+            #             x1, y1, x2, y2 = self.rim_a_bounding_box
+            #             color = (0, 255, 0)  # Green for rim_a (BGR format)
+            #             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+            #         
+            #         # Draw rim_b bounding box only (no label to avoid duplicates)
+            #         if self.rim_b_detected and self.rim_b_bounding_box is not None:
+            #             x1, y1, x2, y2 = self.rim_b_bounding_box
+            #             color = (0, 255, 255)  # Yellow for rim_b (BGR format)
+            #             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+            #         
+            #         # self.save_detection_image(annotated_frame, "rim", frame_number, fps)
+            #         self.rim_image_saved = True
+            #         self.rim_image_saved_frame = frame_number
             
             return self.rim_a_detected or self.rim_b_detected
         
@@ -1384,83 +1385,83 @@ class BasketballAnalyzer:
         """
         annotated = frame.copy()
         
-        # Draw rim_a if detected
-        if self.rim_a_detected and self.rim_a_bounding_box is not None:
-            x1, y1, x2, y2 = self.rim_a_bounding_box
-            color = (0, 255, 0)  # Green for rim_a (BGR format)
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            
-            # Draw label on rim_a
-            label = "rim_a"
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-            )
-            # cv2.rectangle(
-            #     annotated,
-            #     (x1, y1 - text_height - 10),
-            #     (x1 + text_width, y1),
-            #     color,
-            #     -1
-            # )
-            # cv2.putText(
-            #     annotated,
-            #     label,
-            #     (x1, y1 - 5),
-            #     cv2.FONT_HERSHEY_SIMPLEX,
-            #     0.6,
-            #     (255, 255, 255),  # White text
-            #     2
-            # )
-            
-            # Draw standard line across rim_a
-            if self.rim_a_standard_line is not None:
-                cv2.line(annotated, self.rim_a_standard_line[0], self.rim_a_standard_line[1], color, 2)
+        # Draw rim_a if detected - DISABLED
+        # if self.rim_a_detected and self.rim_a_bounding_box is not None:
+        #     x1, y1, x2, y2 = self.rim_a_bounding_box
+        #     color = (0, 255, 0)  # Green for rim_a (BGR format)
+        #     cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        #     
+        #     # Draw label on rim_a
+        #     label = "rim_a"
+        #     (text_width, text_height), baseline = cv2.getTextSize(
+        #         label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+        #     )
+        #     # cv2.rectangle(
+        #     #     annotated,
+        #     #     (x1, y1 - text_height - 10),
+        #     #     (x1 + text_width, y1),
+        #     #     color,
+        #     #     -1
+        #     # )
+        #     # cv2.putText(
+        #     #     annotated,
+        #     #     label,
+        #     #     (x1, y1 - 5),
+        #     #     cv2.FONT_HERSHEY_SIMPLEX,
+        #     #     0.6,
+        #     #     (255, 255, 255),  # White text
+        #     #     2
+        #     # )
+        #     
+        #     # Draw standard line across rim_a
+        #     if self.rim_a_standard_line is not None:
+        #         cv2.line(annotated, self.rim_a_standard_line[0], self.rim_a_standard_line[1], color, 2)
         
-        # Draw rim_b if detected
-        if self.rim_b_detected and self.rim_b_bounding_box is not None:
-            x1, y1, x2, y2 = self.rim_b_bounding_box
-            color = (0, 255, 255)  # Yellow for rim_b (BGR format)
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            
-            # Draw label on rim_b
-            label = "rim_b"
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-            )
-            # cv2.rectangle(
-            #     annotated,
-            #     (x1, y1 - text_height - 10),
-            #     (x1 + text_width, y1),
-            #     color,
-            #     -1
-            # )
-            # cv2.putText(
-            #     annotated,
-            #     label,
-            #     (x1, y1 - 5),
-            #     cv2.FONT_HERSHEY_SIMPLEX,
-            #     0.6,
-            #     (255, 255, 255),  # White text
-            #     2
-            # )
-            
-            # Draw standard line across rim_b
-            if self.rim_b_standard_line is not None:
-                cv2.line(annotated, self.rim_b_standard_line[0], self.rim_b_standard_line[1], color, 2)
+        # Draw rim_b if detected - DISABLED
+        # if self.rim_b_detected and self.rim_b_bounding_box is not None:
+        #     x1, y1, x2, y2 = self.rim_b_bounding_box
+        #     color = (0, 255, 255)  # Yellow for rim_b (BGR format)
+        #     cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        #     
+        #     # Draw label on rim_b
+        #     label = "rim_b"
+        #     (text_width, text_height), baseline = cv2.getTextSize(
+        #         label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+        #     )
+        #     # cv2.rectangle(
+        #     #     annotated,
+        #     #     (x1, y1 - text_height - 10),
+        #     #     (x1 + text_width, y1),
+        #     #     color,
+        #     #     -1
+        #     # )
+        #     # cv2.putText(
+        #     #     annotated,
+        #     #     label,
+        #     #     (x1, y1 - 5),
+        #     #     cv2.FONT_HERSHEY_SIMPLEX,
+        #     #     0.6,
+        #     #     (255, 255, 255),  # White text
+        #     #     2
+        #     # )
+        #     
+        #     # Draw standard line across rim_b
+        #     if self.rim_b_standard_line is not None:
+        #         cv2.line(annotated, self.rim_b_standard_line[0], self.rim_b_standard_line[1], color, 2)
         
         # Ball tracking lines removed - tracking data is still collected for goal detection
         
-        # Draw ball position
-        if ball_position:
-            cv2.circle(annotated, ball_position, 10, (0, 0, 255), -1)
-            cv2.circle(annotated, ball_position, 15, (0, 0, 255), 2)
+        # Draw ball position - DISABLED
+        # if ball_position:
+        #     cv2.circle(annotated, ball_position, 10, (0, 0, 255), -1)
+        #     cv2.circle(annotated, ball_position, 15, (0, 0, 255), 2)
         
-        # Draw players
-        for player in players:
-            x1, y1, x2, y2 = player['bbox']
-            conf = player['confidence']
-            cls_name = player.get('class_name', 'Player')
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 255, 0), 2)
+        # Draw players - DISABLED
+        # for player in players:
+        #     x1, y1, x2, y2 = player['bbox']
+        #     conf = player['confidence']
+        #     cls_name = player.get('class_name', 'Player')
+        #     cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 255, 0), 2)
         
         # Draw shot detection indicator (removed text annotation)
         # if self.shot_detected:
