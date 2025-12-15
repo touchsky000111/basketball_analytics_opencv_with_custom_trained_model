@@ -297,7 +297,7 @@ def generate_video(input_dir, output_path, fps=30.0):
     return True
 
 
-def generate_goal_clips(goal_history, analyzed_frames_dir, output_dir, fps, clip_duration_before=3.0, clip_duration_after=2.0):
+def generate_goal_clips(goal_history, analyzed_frames_dir, output_dir, fps, clip_duration_before=10.0, clip_duration_after=5.0):
     """
     Generate individual video clips for each goal event.
     
@@ -306,8 +306,8 @@ def generate_goal_clips(goal_history, analyzed_frames_dir, output_dir, fps, clip
         analyzed_frames_dir: Directory containing analyzed frame images
         output_dir: Directory to save goal clips
         fps: Frames per second
-        clip_duration_before: Seconds before goal to include (default: 3.0)
-        clip_duration_after: Seconds after goal to include (default: 2.0)
+        clip_duration_before: Seconds before goal to include (default: 10.0)
+        clip_duration_after: Seconds after goal to include (default: 5.0)
     
     Returns:
         List of created clip file paths
@@ -624,7 +624,9 @@ Examples:
             goal_history=analyzer.goal_history,
             analyzed_frames_dir=args.output_images_dir,
             output_dir=str(goal_clips_dir),
-            fps=fps
+            fps=fps,
+            clip_duration_before=10.0,
+            clip_duration_after=5.0
         )
         
         # Cleanup intermediate files (delete by default, unless --keep-intermediate is used)
