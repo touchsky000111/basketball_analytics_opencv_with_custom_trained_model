@@ -505,6 +505,14 @@ Examples:
     parser.add_argument('--ball-model', type=str, default='model/best.pt',
                        help='Path to ball detection model for ball_detect module (default: model/best.pt)')
     
+    # Display arguments
+    parser.add_argument('--mark-ball', action='store_true',
+                       help='Mark ball position on frames with a circle')
+    parser.add_argument('--show-goal-text', action='store_true',
+                       help='Display goal notification text on frames when a goal is detected')
+    parser.add_argument('--show-score-text', action='store_true',
+                       help='Display score text (Team A and Team B goals) on frames')
+    
     # Cleanup arguments
     parser.add_argument('--keep-intermediate', action='store_true',
                        help='Keep intermediate frame directories (images/ and output_images/) after processing')
@@ -555,7 +563,41 @@ Examples:
             
             print("Cleanup complete!")
     
+    # Function to clean directories before processing
+    def cleanup_before_processing():
+        """Remove images and output_images directories before processing to ensure clean start"""
+        print("\n" + "="*60)
+        print("PRE-PROCESSING: Cleaning existing directories")
+        print("="*60)
+        
+        import shutil
+        
+        if Path(args.images_dir).exists():
+            print(f"  Removing {args.images_dir}/")
+            try:
+                shutil.rmtree(args.images_dir)
+                print(f"    ✓ Deleted {args.images_dir}/")
+            except Exception as e:
+                print(f"    ✗ Error deleting {args.images_dir}/: {e}")
+        else:
+            print(f"  {args.images_dir}/ does not exist, skipping...")
+        
+        if Path(args.output_images_dir).exists():
+            print(f"  Removing {args.output_images_dir}/")
+            try:
+                shutil.rmtree(args.output_images_dir)
+                print(f"    ✓ Deleted {args.output_images_dir}/")
+            except Exception as e:
+                print(f"    ✗ Error deleting {args.output_images_dir}/: {e}")
+        else:
+            print(f"  {args.output_images_dir}/ does not exist, skipping...")
+        
+        print("Pre-processing cleanup complete!")
+    
     try:
+        # Clean directories before processing
+        cleanup_before_processing()
+        
         # STEP 1: Extract frames from video
         result = extract_frames(
             video_path=video_path,
@@ -583,7 +625,10 @@ Examples:
             device=args.device,
             use_yolov8n_for_ball=args.use_yolov8n_ball,
             use_ball_detect_module=args.use_ball_detect_module,
-            ball_model_path=args.ball_model
+            ball_model_path=args.ball_model,
+            mark_ball=args.mark_ball,
+            show_goal_text=args.show_goal_text,
+            show_score_text=args.show_score_text
         )
         
         frames_processed = analyze_frames(

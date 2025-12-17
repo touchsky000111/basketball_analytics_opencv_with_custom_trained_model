@@ -33,12 +33,13 @@ python main.py --video input/input_video.mp4 --output output/video.mp4
 ```
 
 This will:
-1. Extract frames from the input video
-2. Analyze each frame for ball, rim, and player detection
-3. Detect and count goals
-4. Generate an annotated output video (optional)
-5. **Automatically create individual goal clips** (e.g., `team_a_goal_1.mp4`, `team_b_goal_1.mp4`)
-6. Automatically clean up intermediate files
+1. **Automatically clean existing directories** (`images/` and `output_images/`) before processing
+2. Extract frames from the input video
+3. Analyze each frame for ball, rim, and player detection
+4. Detect and count goals
+5. Generate an annotated output video (optional)
+6. **Automatically create individual goal clips** (e.g., `team_a_goal_1.mp4`, `team_b_goal_1.mp4`)
+7. Automatically clean up intermediate files after processing
 
 ## Command Line Arguments
 
@@ -71,6 +72,12 @@ This will:
 - `--confidence`: Confidence threshold for detections (default: 0.3)
 - `--device`: Device to use - "cuda", "cpu", or None for auto-detect (default: None)
 - `--ball-model`: Path to ball detection model (default: model/best.pt)
+
+### Display Options
+
+- `--mark-ball`: Mark ball position on frames with a red circle
+- `--show-goal-text`: Display goal notification text ("GOAL! [Team Name]") on frames when a goal is detected
+- `--show-score-text`: Display score text ("Team A: X | Team B: Y") on frames
 
 ### Other Options
 
@@ -113,6 +120,12 @@ python main.py --video input/input_video.mp4 --output output/video.mp4 --device 
 python main.py --video input/input_video.mp4 --output output/video.mp4 --keep-intermediate
 ```
 
+### Enable visual annotations (ball marking, goal text, score)
+```bash
+python main.py --video input/input_video.mp4 --output output/video.mp4 \
+    --mark-ball --show-goal-text --show-score-text
+```
+
 ### Use custom model paths
 ```bash
 python main.py --video input/input_video.mp4 --output output/video.mp4 \
@@ -141,15 +154,19 @@ BasketBall_Analytics/
 
 ## How It Works
 
-The processing pipeline consists of three main steps:
+The processing pipeline consists of four main steps:
 
-1. **Frame Extraction**: Extracts frames from the input video and saves them as images
-2. **Frame Analysis**: 
+1. **Pre-processing Cleanup**: Automatically deletes existing `images/` and `output_images/` directories to ensure a clean start
+2. **Frame Extraction**: Extracts frames from the input video and saves them as images
+3. **Frame Analysis**: 
    - Detects basketball, rims (rim_a and rim_b), and players
    - Tracks ball movement and position relative to rims
    - Detects goals based on ball trajectory through rim
-   - Annotates frames with bounding boxes, scores, and goal notifications
-3. **Video Generation**: Combines analyzed frames into final output video
+   - Annotates frames with optional visual elements:
+     - Ball position marking (if `--mark-ball` is enabled)
+     - Goal notification text (if `--show-goal-text` is enabled)
+     - Score display (if `--show-score-text` is enabled)
+4. **Video Generation**: Combines analyzed frames into final output video and generates individual goal clips
 
 ## Output
 
@@ -157,12 +174,13 @@ The script provides:
 - **Goal Clips** (automatically generated in `goal_clips/` directory):
   - Individual video clips for each goal event
   - Naming: `team_a_goal_1.mp4`, `team_a_goal_2.mp4`, `team_b_goal_1.mp4`, etc.
-  - Each clip includes 3 seconds before and 2 seconds after the goal
-- Annotated output video (optional, if `--output` is specified) with:
-  - Ball detection (red circle)
-  - Rim detection (green/yellow boxes)
-  - Player detection (cyan boxes)
+  - Each clip includes 10 seconds before and 5 seconds after the goal
+- Annotated output video (optional, if `--output` is specified) with optional visual annotations:
+  - Ball position marking (red circle, if `--mark-ball` is enabled)
+  - Goal notification text ("GOAL! [Team Name]", if `--show-goal-text` is enabled)
+  - Score display ("Team A: X | Team B: Y", if `--show-score-text` is enabled)
 - Console output with:
+  - Pre-processing cleanup status
   - Processing progress
   - Goal detection results
   - Final score summary
@@ -177,9 +195,10 @@ The script provides:
 
 ## Notes
 
-- Intermediate directories (`images/` and `output_images/`) are automatically deleted after processing unless `--keep-intermediate` is used
+- **Automatic Cleanup**: The script automatically deletes `images/` and `output_images/` directories **before** processing starts to ensure a clean workspace. These directories are also deleted **after** processing unless `--keep-intermediate` is used.
 - The script automatically detects and uses GPU if available
 - Frame extraction interval can be adjusted to speed up processing (higher interval = fewer frames = faster but less detailed)
+- Display options (`--mark-ball`, `--show-goal-text`, `--show-score-text`) are disabled by default. Enable them to add visual annotations to the output video.
 
 ## Troubleshooting
 

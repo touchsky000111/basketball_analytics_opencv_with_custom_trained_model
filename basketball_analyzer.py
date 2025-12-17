@@ -25,7 +25,7 @@ except ImportError:
 
 
 class BasketballAnalyzer:
-    def __init__(self, ball_rim_model_path=None, shot_model_path=None, player_model_path=None, confidence_threshold=0.5, device=None, use_yolov8n_for_ball=False, use_ball_detect_module=True, ball_model_path="model/best.pt"):
+    def __init__(self, ball_rim_model_path=None, shot_model_path=None, player_model_path=None, confidence_threshold=0.5, device=None, use_yolov8n_for_ball=False, use_ball_detect_module=True, ball_model_path="model/best.pt", mark_ball=False, show_goal_text=False, show_score_text=False):
         """
         Initialize the Basketball Analyzer
         
@@ -39,11 +39,17 @@ class BasketballAnalyzer:
             use_yolov8n_for_ball: If True, use yolov8n (COCO class 32: sports ball) for ball detection instead of custom model
             use_ball_detect_module: If True, use BasketballColorDetector from ball_detect.py for ball detection
             ball_model_path: Path to ball detection model (best.pt) for use with ball_detect module
+            mark_ball: If True, draw ball position on frames (default: False)
+            show_goal_text: If True, display goal notification text on frames (default: False)
+            show_score_text: If True, display score text on frames (default: False)
         """
         self.confidence_threshold = confidence_threshold
         self.use_yolov8n_for_ball = use_yolov8n_for_ball
         self.use_ball_detect_module = use_ball_detect_module and BALL_DETECT_AVAILABLE
         self.ball_model_path = ball_model_path
+        self.mark_ball = mark_ball
+        self.show_goal_text = show_goal_text
+        self.show_score_text = show_score_text
         
         # Set device (GPU/CPU)
         if device is None:
@@ -1451,10 +1457,10 @@ class BasketballAnalyzer:
         
         # Ball tracking lines removed - tracking data is still collected for goal detection
         
-        # Draw ball position - DISABLED
-        # if ball_position:
-        #     cv2.circle(annotated, ball_position, 10, (0, 0, 255), -1)
-        #     cv2.circle(annotated, ball_position, 15, (0, 0, 255), 2)
+        # Draw ball position
+        if self.mark_ball and ball_position:
+            cv2.circle(annotated, ball_position, 10, (0, 0, 255), -1)
+            cv2.circle(annotated, ball_position, 15, (0, 0, 255), 2)
         
         # Draw players - DISABLED
         # for player in players:
@@ -1469,8 +1475,19 @@ class BasketballAnalyzer:
         #                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         
         # Draw goal notification if recent goal detected (display for 30 frames)
-        # Text annotation removed
-        if self.recent_goal is not None and frame_number is not None:
+        if self.show_goal_text and self.recent_goal is not None and frame_number is not None:
+            if frame_number > self.recent_goal['display_until']:
+                # Clear recent goal if display time expired
+                self.recent_goal = None
+            else:
+                # Display goal notification text
+                goal_text = f"GOAL! {self.recent_goal['team']}"
+                # Draw text with black outline for visibility
+                cv2.putText(annotated, goal_text, (10, 50), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 4)  # Black outline
+                cv2.putText(annotated, goal_text, (10, 50), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)  # Green text
+        elif self.recent_goal is not None and frame_number is not None:
             if frame_number > self.recent_goal['display_until']:
                 # Clear recent goal if display time expired
                 self.recent_goal = None
@@ -1992,12 +2009,14 @@ class BasketballAnalyzer:
                 #     1
                 # )
         
-        # Draw score (text annotation removed)
-        # score_text = f"Team A: {self.team_goals['Team A']}  |  Team B: {self.team_goals['Team B']}"
-        # cv2.putText(annotated, score_text, (10, 30), 
-        #            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
-        # cv2.putText(annotated, score_text, (10, 30), 
-        #            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+        # Draw score
+        if self.show_score_text:
+            score_text = f"Team A: {self.team_goals['Team A']}  |  Team B: {self.team_goals['Team B']}"
+            # Draw text with black outline for visibility
+            cv2.putText(annotated, score_text, (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)  # Black outline
+            cv2.putText(annotated, score_text, (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)  # White text
         
         return annotated
 
